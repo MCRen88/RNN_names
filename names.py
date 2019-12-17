@@ -64,9 +64,12 @@ def category_from_output(output):
     category_i = top_i[0][0]
     return all_categories[category_i], category_i
 
+def random_choice(l):
+    return l[random.randint(0, len(l) - 1)]
+
 def random_training_pair():
-    category = random.choice(all_categories)
-    line = random.choice(category_languages[category])
+    category = random_choice(all_categories)
+    line = random_choice(category_languages[category])
     category_tensor = Variable(torch.LongTensor([all_categories.index(category)]))
     line_tensor = Variable(line_to_tensor(line))
     return category, line, category_tensor, line_tensor
