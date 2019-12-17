@@ -6,6 +6,11 @@ import torch.nn as nn
 from torch.autograd import Variable
 import random
 
+import time
+import math
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
 #all_text_files = glob.glob ('data/names/*.txt')
 #print (all_text_files)
 
@@ -14,6 +19,8 @@ import random
 # Это поможет с удалением диакритиков в словах.
 # Например, французское имя Béringer будет конвертировано в Beringer
 
+
+criterion = nn.NLLLoss()
 all_letters = string.ascii_letters + ".,;'"
 n_letters = len(all_letters)
 
@@ -52,7 +59,7 @@ def line_to_tensor(line):
     return tensor
 #print (letter_to_tensor('M'))
 
-def category_of_output(output):
+def category_from_output(output):
     top_n, top_i = output.data.tork(1)
     category_i = top_i [0][0]
     return all_categories[category_i], category_i
@@ -64,7 +71,87 @@ def random_training_pair():
     line_tensor = Variable(line_to_tensor(line))
     return category, line, category_tensor, line_tensor
 
+def train (category_tensor, line_tensor):
+    rnn.zero_grad()
+    hidden = rnn.init_hidden()
     
+    for i in range(line_tensor.size()[0]):
+        output, hidden = rnn(line_tensor[i], hidden)
+        
+    loss = criterion(output, category_tensor)
+    loss.backward()
+    
+    optimizer.step()
+    
+    return output, loss.data[0]
+
+###############################################################################
+n_epochs = 100000
+print_every = 5000
+plot_every = 1000
+
+current_loss = 0
+all_losses = []
+
+def time_since(since):
+    now = time.time()
+    s = now - since
+    m = math.floor(s/60)
+    s -= m * 60
+    return '%dm %ds' % (m, s)
+
+start = time.time()
+
+for epoch in range(1, n_epochs + 1):
+    category, line, category_tensor, line_tensor = random_training_pair()
+    output, loss = train(category_tensor, line_tensor)
+    current_loss += loss
+    
+    if epoch % print_every == 0:
+        guess, guess_i = category_from_output(output)
+        correct = '✓' if guess == category else '✗ (%s)' % category
+        print ('%d %d%% (%s) %.4f %s / %s %s' % (epoch, epoch / n_epochs * 100, time_since(start), loss, line, guess, correct))
+        
+    if epoch % plot_every == 0:
+        all_losses.append(current_loss / plot_every)
+        current_loss = 0
+        
+plt.figure()
+plt.plot(all_losses)
+##############################################################################
+confusion = torch.zeros(no_of_languages, no_of_languages)
+n_confusion = 10000
+
+def evaluate(line_tensor):
+    hidden = rnn.init_hidden()
+    
+    for i in range(line_tensor.size()[0]):
+        output, hidden = rnn(line_tensor[i], hidden)
+    return output
+
+for i in range(n_confusion):
+    category, line, category_tensor, line_tensor = random_training_pair()
+    output = evaluate(line_tensor)
+    guess, guess_i = category_from_output(output)
+    category_i = all_categories.index(category)
+    confusion[category_i][guess_i] += 1
+    
+for i in range(no_of_languages):
+    confusion[i] = confusion[i] / confusion[i].sum()
+    
+fig = plt.figure()
+ax = fig.add_subplot(111)
+cax = ax.matshow(confusion.numpy())
+fig.colorbar(cax)
+
+ax.set_xticklabels([''] + all_categories, rotation=90)
+ax.set_yticklabels([''] + all_categories)
+
+ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+
+plt.show()
+##############################################################################  
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(RNN, self).__init__()
@@ -103,6 +190,9 @@ if __name__ == '__main__':
     
     n_hidden = 128
     rnn = RNN (n_letters, n_hidden, no_of_languages)
+    
+    learning_rate = 0.005
+    optimizer = torch.optim.SGD(rnn.parameters(), lr = learning_rate)
     
     #input = Variable(letter_to_tensor('D'))
     #hidden = rnn.init_hidden()
