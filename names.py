@@ -4,6 +4,7 @@ import string
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import random
 
 #all_text_files = glob.glob ('data/names/*.txt')
 #print (all_text_files)
@@ -50,6 +51,19 @@ def line_to_tensor(line):
         tensor[li][0][letter_index] = 1
     return tensor
 #print (letter_to_tensor('M'))
+
+def category_of_output(output):
+    top_n, top_i = output.data.tork(1)
+    category_i = top_i [0][0]
+    return all_categories[category_i], category_i
+
+def random_training_pair():
+    category = random.choice(all_categories)
+    line = random.choice(category_languages[category])
+    category_tensor = Variable(torch.LongTensor([all_categories.index(category)]))
+    line_tensor = Variable(line_to_tensor(line))
+    return category, line, category_tensor, line_tensor
+
     
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -90,14 +104,19 @@ if __name__ == '__main__':
     n_hidden = 128
     rnn = RNN (n_letters, n_hidden, no_of_languages)
     
-    input = Variable(letter_to_tensor('D'))
-    hidden = rnn.init_hidden()
+    #input = Variable(letter_to_tensor('D'))
+    #hidden = rnn.init_hidden()
     
-    output, next_hidden = rnn(input, hidden)
-    print('output.size= ', output.size())
+    #output, next_hidden = rnn(input, hidden)
+    #print('output.size= ', output.size())
     
-    input = Variable(line_to_tensor('Derrick'))
-    hidden = Variable(torch.zeros(1, n_hidden))
+    #input = Variable(line_to_tensor('Derrick'))
+    #hidden = Variable(torch.zeros(1, n_hidden))
     
-    output, next_hidden = rnn(input[0], hidden)
-    print (output)
+    #output, next_hidden = rnn(input[0], hidden)
+    #print (output)
+    
+# Тренировка RNN
+    for i in range(10):
+        category, line, category_tensor, line_tensor = random_training_pair()
+        print('category= ', category, '/ line', line)
