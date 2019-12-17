@@ -18,9 +18,9 @@ import matplotlib.ticker as ticker
 # Однако, нам нужно конвертировать их в стандарт ASCII. 
 # Это поможет с удалением диакритиков в словах.
 # Например, французское имя Béringer будет конвертировано в Beringer
-
-
 criterion = nn.NLLLoss()
+learning_rate = 0.005
+
 all_letters = string.ascii_letters + ".,;'"
 n_letters = len(all_letters)
 
@@ -61,7 +61,7 @@ def line_to_tensor(line):
 
 def category_from_output(output):
     top_n, top_i = output.data.tork(1)
-    category_i = top_i [0][0]
+    category_i = top_i[0][0]
     return all_categories[category_i], category_i
 
 def random_training_pair():
@@ -71,21 +71,44 @@ def random_training_pair():
     line_tensor = Variable(line_to_tensor(line))
     return category, line, category_tensor, line_tensor
 
+###############################################################################
+class RNN(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(RNN, self).__init__()
+ 
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+ 
+        self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
+        self.i2o = nn.Linear(input_size + hidden_size, output_size)
+        self.softmax = nn.LogSoftmax()
+ 
+    def forward(self, input, hidden):
+        combined = torch.cat((input, hidden), 1)
+        hidden = self.i2h(combined)
+        output = self.i2o(combined)
+        output = self.dim = output
+        return output, hidden
+ 
+    def init_hidden(self):
+        return Variable(torch.zeros(1, self.hidden_size))
+
+###############################################################################
 def train (category_tensor, line_tensor):
     rnn.zero_grad()
     hidden = rnn.init_hidden()
-    
+
     for i in range(line_tensor.size()[0]):
         output, hidden = rnn(line_tensor[i], hidden)
         
     loss = criterion(output, category_tensor)
     loss.backward()
-    
+
     optimizer.step()
-    
+        
     return output, loss.data[0]
 
-###############################################################################
 n_epochs = 100000
 print_every = 5000
 plot_every = 1000
@@ -118,7 +141,12 @@ for epoch in range(1, n_epochs + 1):
         
 plt.figure()
 plt.plot(all_losses)
-##############################################################################
+
+no_of_languages = len(all_categories)
+n_hidden = 128
+rnn = RNN (n_letters, n_hidden, no_of_languages)
+optimizer = torch.optim.SGD(rnn.parameters(), lr = learning_rate)
+
 confusion = torch.zeros(no_of_languages, no_of_languages)
 n_confusion = 10000
 
@@ -151,30 +179,26 @@ ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
 plt.show()
-##############################################################################  
-class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(RNN, self).__init__()
+
+###############################################################################
+#predict
+def predict(input_line, n_predictions=3):
+    print('\n> %s' % input_line)
+    output = evaluate(Variable(line_to_tensor(input_line)))
  
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
+    topv, topi = output.data.topk(n_predictions, 1, True)
+    predictions = []
  
-        self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
-        self.i2o = nn.Linear(input_size + hidden_size, output_size)
-        self.softmax = nn.LogSoftmax()
+    for i in range(n_predictions):
+        value = topv[0][i]
+        category_index = topi[0][i]
+        print('(%.2f) %s' % (value, all_categories[category_index]))
+        predictions.append([value, all_categories[category_index]])
  
-    def forward(self, input, hidden):
-        combined = torch.cat((input, hidden), 1)
-        hidden = self.i2h(combined)
-        output = self.i2o(combined)
-        output = self.dim = output
-        return output, hidden
- 
-    def init_hidden(self):
-        return Variable(torch.zeros(1, self.hidden_size))
-    
+predict('Austin')
+###############################################################################
 if __name__ == '__main__':
+    
     category_languages = {}
     all_categories = []
     
@@ -185,15 +209,14 @@ if __name__ == '__main__':
         all_categories.append(category)
         languages = [unicode_to_ascii(line.strip()) for line in open(filename).readlines()]
         category_languages[category] = languages
+
+###############################################################################
+# Тренировка RNN
+    for i in range(10):
+       category, line, category_tensor, line_tensor = random_training_pair()
+       print('category= ', category, '/ line', line)
+        
  
-    no_of_languages = len(all_categories)
-    
-    n_hidden = 128
-    rnn = RNN (n_letters, n_hidden, no_of_languages)
-    
-    learning_rate = 0.005
-    optimizer = torch.optim.SGD(rnn.parameters(), lr = learning_rate)
-    
     #input = Variable(letter_to_tensor('D'))
     #hidden = rnn.init_hidden()
     
@@ -205,8 +228,3 @@ if __name__ == '__main__':
     
     #output, next_hidden = rnn(input[0], hidden)
     #print (output)
-    
-# Тренировка RNN
-    for i in range(10):
-        category, line, category_tensor, line_tensor = random_training_pair()
-        print('category= ', category, '/ line', line)
